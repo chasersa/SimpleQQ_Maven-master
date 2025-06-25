@@ -18,15 +18,13 @@ public class ChatWindow extends JFrame {
     private Client client;
     private JTabbedPane tabbedPane;
     private JList<String> friendList;
-    private JList<String> onlineUserList;
-    private JList<String> groupList; // New: Group List
+    private JList<String> groupList; // Group List
     private DefaultListModel<String> friendListModel;
-    private DefaultListModel<String> onlineUserListModel;
-    private DefaultListModel<String> groupListModel; // New: Group List Model
+    private DefaultListModel<String> groupListModel; // Group List Model
     private Map<String, SingleChatWindow> singleChatWindows;
     private Map<String, GroupChatWindow> groupChatWindows;
 
-    // New: Request Panel components
+    // Request Panel components
     private JPanel requestPanel;
     private DefaultListModel<String> friendRequestListModel;
     private JList<String> friendRequestList;
@@ -47,7 +45,7 @@ public class ChatWindow extends JFrame {
         JPanel mainPanel = new JPanel(new BorderLayout());
         add(mainPanel);
 
-        // Left Panel for Friends, Online Users, Groups, and Requests
+        // Left Panel for Friends, Groups, and Requests
         JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.setPreferredSize(new Dimension(200, 0));
         tabbedPane = new JTabbedPane();
@@ -66,23 +64,6 @@ public class ChatWindow extends JFrame {
             }
         });
         tabbedPane.addTab("好友", new JScrollPane(friendList));
-
-        // Online Users Tab
-        onlineUserListModel = new DefaultListModel<>();
-        onlineUserList = new JList<>(onlineUserListModel);
-        onlineUserList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        onlineUserList.addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                String selectedUser = onlineUserList.getSelectedValue();
-                if (selectedUser != null) {
-                    String userId = selectedUser.split(" ")[0];
-                    if (!userId.equals(client.getCurrentUser().getId())) { // Cannot chat with self
-                        openSingleChatWindow(userId);
-                    }
-                }
-            }
-        });
-        tabbedPane.addTab("在线用户", new JScrollPane(onlineUserList));
 
         // Groups Tab
         groupListModel = new DefaultListModel<>();
@@ -163,6 +144,8 @@ public class ChatWindow extends JFrame {
                 int confirm = JOptionPane.showConfirmDialog(this, "确定要删除好友 " + friendId + " 吗？", "删除好友", JOptionPane.YES_NO_OPTION);
                 if (confirm == JOptionPane.YES_OPTION) {
                     client.sendMessage(new Message(MessageType.DELETE_FRIEND, client.getCurrentUser().getId(), friendId, ""));
+                    // 关闭与该好友的聊天窗口
+                    closeSingleChatWindow(friendId);
                 }
             } else {
                 JOptionPane.showMessageDialog(this, "请选择要删除的好友。");
@@ -198,7 +181,6 @@ public class ChatWindow extends JFrame {
 
         // Request initial data
         client.sendMessage(new Message(MessageType.FRIEND_LIST, client.getCurrentUser().getId(), "Server", ""));
-        client.sendMessage(new Message(MessageType.ONLINE_USERS, client.getCurrentUser().getId(), "Server", ""));
         client.sendMessage(new Message(MessageType.GET_GROUPS, client.getCurrentUser().getId(), "Server", "")); // Request groups
         client.sendMessage(new Message(MessageType.GET_PENDING_REQUESTS, client.getCurrentUser().getId(), "Server", "")); // Request pending requests
 
@@ -215,9 +197,6 @@ public class ChatWindow extends JFrame {
         switch (message.getType()) {
             case FRIEND_LIST:
                 updateFriendList(message.getContent());
-                break;
-            case ONLINE_USERS:
-                updateOnlineUserList(message.getContent());
                 break;
             case TEXT_MESSAGE:
             case IMAGE_MESSAGE:
@@ -245,7 +224,10 @@ public class ChatWindow extends JFrame {
             case IMAGE_ACCEPT:
             case IMAGE_REJECT:
                 // These messages are for the sender, pass to SingleChatWindow
-                openSingleChatWindow(message.getReceiverId()).handleImageMessage(message);
+                SingleChatWindow chatWindow = singleChatWindows.get(message.getReceiverId());
+                if (chatWindow != null) {
+                    chatWindow.handleImageMessage(message);
+                }
                 break;
             case ADD_FRIEND_SUCCESS:
                 JOptionPane.showMessageDialog(this, "添加好友成功: " + message.getContent());
@@ -382,21 +364,6 @@ public class ChatWindow extends JFrame {
         }
     }
 
-    private void updateOnlineUserList(String onlineUserListStr) {
-        onlineUserListModel.clear();
-        if (onlineUserListStr != null && !onlineUserListStr.isEmpty()) {
-            String[] users = onlineUserListStr.split(";");
-            for (String userInfo : users) {
-                String[] parts = userInfo.split(":");
-                if (parts.length == 2) {
-                    String id = parts[0];
-                    String username = parts[1];
-                    onlineUserListModel.addElement(id + " " + username);
-                }
-            }
-        }
-    }
-
     private void updateGroupList(String groupListStr) {
         groupListModel.clear();
         if (groupListStr != null && !groupListStr.isEmpty()) {
@@ -449,6 +416,14 @@ public class ChatWindow extends JFrame {
             chatWindow.toFront(); // Bring to front if already open
         }
         return chatWindow;
+    }
+
+    private void closeSingleChatWindow(String friendId) {
+        SingleChatWindow chatWindow = singleChatWindows.get(friendId);
+        if (chatWindow != null) {
+            chatWindow.dispose();
+            singleChatWindows.remove(friendId);
+        }
     }
 
     private GroupChatWindow openGroupChatWindow(String groupId) {

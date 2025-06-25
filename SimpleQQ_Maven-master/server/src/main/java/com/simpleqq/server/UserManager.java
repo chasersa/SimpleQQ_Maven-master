@@ -195,10 +195,22 @@ public class UserManager {
         boolean removed2 = user2Friends.remove(userId1);
 
         if (removed1 && removed2) {
+            // 清理空的好友列表
+            if (user1Friends.isEmpty()) {
+                friendships.remove(userId1);
+            }
+            if (user2Friends.isEmpty()) {
+                friendships.remove(userId2);
+            }
             saveFriendships();
             return true;
         }
         return false;
+    }
+
+    public boolean areFriends(String userId1, String userId2) {
+        List<String> user1Friends = friendships.get(userId1);
+        return user1Friends != null && user1Friends.contains(userId2);
     }
 
     public List<String> getFriends(String userId) {
@@ -217,5 +229,3 @@ public class UserManager {
         return users;
     }
 }
-
-

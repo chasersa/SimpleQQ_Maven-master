@@ -146,7 +146,6 @@ public class ClientHandler extends Thread {
             user.setOnline(true);
             sendMessage(new Message(MessageType.LOGIN_SUCCESS, "Server", id, user.getUsername()));
             sendFriendList(id);
-            sendOnlineUsersList();
             sendPendingFriendRequests(id); // Send pending friend requests on login
             sendGroupList(id); // Send group list on login
             sendPendingRequests(id); // Send all pending requests on login
@@ -234,6 +233,12 @@ public class ClientHandler extends Thread {
     }
 
     private void handleTextMessage(Message message) throws IOException {
+        // 检查发送者和接收者是否为好友关系
+        if (!server.getUserManager().areFriends(message.getSenderId(), message.getReceiverId())) {
+            sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", message.getSenderId(), "You can only send messages to friends."));
+            return;
+        }
+
         ClientHandler receiverHandler = server.getOnlineClients().get(message.getReceiverId());
         if (receiverHandler != null) {
             receiverHandler.sendMessage(message);
@@ -248,6 +253,12 @@ public class ClientHandler extends Thread {
     private void handleGroupMessage(Message message) throws IOException {
         List<String> groupMembers = server.getGroupManager().getGroupMembers(message.getReceiverId());
         if (groupMembers != null) {
+            // 检查发送者是否为群成员
+            if (!groupMembers.contains(message.getSenderId())) {
+                sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", message.getSenderId(), "You are not a member of group " + message.getReceiverId() + "."));
+                return;
+            }
+            
             // 只转发给群内其他成员（不包括发送者）
             for (String memberId : groupMembers) {
                 if (!memberId.equals(message.getSenderId())) { // 不发送给自己
@@ -271,7 +282,13 @@ public class ClientHandler extends Thread {
         // 判断是群聊还是单聊
         List<String> groupMembers = server.getGroupManager().getGroupMembers(message.getReceiverId());
         if (groupMembers != null) {
-            // 群聊图片消息 - 转发给所有其他成员
+            // 群聊图片消息 - 检查发送者是否为群成员
+            if (!groupMembers.contains(message.getSenderId())) {
+                sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", message.getSenderId(), "You are not a member of group " + message.getReceiverId() + "."));
+                return;
+            }
+            
+            // 转发给所有其他成员
             for (String memberId : groupMembers) {
                 if (!memberId.equals(message.getSenderId())) { // 不发送给自己
                     ClientHandler memberHandler = server.getOnlineClients().get(memberId);
@@ -281,7 +298,13 @@ public class ClientHandler extends Thread {
                 }
             }
         } else {
-            // 单聊图片消息 - 直接转发给接收者
+            // 单聊图片消息 - 检查是否为好友关系
+            if (!server.getUserManager().areFriends(message.getSenderId(), message.getReceiverId())) {
+                sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", message.getSenderId(), "You can only send images to friends."));
+                return;
+            }
+            
+            // 直接转发给接收者
             ClientHandler receiverHandler = server.getOnlineClients().get(message.getReceiverId());
             if (receiverHandler != null) {
                 receiverHandler.sendMessage(message);
@@ -428,20 +451,6 @@ public class ClientHandler extends Thread {
             sb.setLength(sb.length() - 1); // Remove trailing semicolon
         }
         sendMessage(new Message(MessageType.FRIEND_LIST, "Server", userId, sb.toString()));
-    }
-
-    public void sendOnlineUsersList() throws IOException {
-        StringBuilder sb = new StringBuilder();
-        for (String onlineUserId : server.getOnlineClients().keySet()) {
-            User onlineUser = server.getUserManager().getUserById(onlineUserId);
-            if (onlineUser != null) {
-                sb.append(onlineUser.getId()).append(":").append(onlineUser.getUsername()).append(";");
-            }
-        }
-        if (sb.length() > 0) {
-            sb.setLength(sb.length() - 1);
-        }
-        sendMessage(new Message(MessageType.ONLINE_USERS, "Server", userId, sb.toString()));
     }
 
     public void sendGroupList(String userId) throws IOException {

@@ -46,14 +46,7 @@ public class Server {
             user.setOnline(true);
         }
         System.out.println("User " + userId + " is now online. Total online: " + onlineClients.size());
-        try {
-            // 通知所有在线用户，有新用户上线
-            for (ClientHandler client : onlineClients.values()) {
-                client.sendOnlineUsersList();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        // 移除了通知所有在线用户的逻辑，因为已经删除了在线用户列表
     }
 
     public synchronized void removeClient(String userId) {
@@ -63,14 +56,7 @@ public class Server {
             user.setOnline(false);
         }
         System.out.println("User " + userId + " went offline. Total online: " + onlineClients.size());
-        try {
-            // 通知所有在线用户，有用户下线
-            for (ClientHandler client : onlineClients.values()) {
-                client.sendOnlineUsersList();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        // 移除了通知所有在线用户的逻辑，因为已经删除了在线用户列表
     }
 
     public boolean isUserOnline(String userId) {
@@ -148,5 +134,3 @@ public class Server {
         server.start();
     }
 }
-
-

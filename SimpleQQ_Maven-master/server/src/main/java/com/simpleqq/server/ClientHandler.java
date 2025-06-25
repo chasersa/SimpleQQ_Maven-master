@@ -281,14 +281,19 @@ public class ClientHandler extends Thread {
                 }
             }
         } else {
-            // 单聊图片消息
+            // 单聊图片消息 - 直接转发给接收者
             ClientHandler receiverHandler = server.getOnlineClients().get(message.getReceiverId());
             if (receiverHandler != null) {
                 receiverHandler.sendMessage(message);
+            } else {
+                sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", message.getSenderId(), "User " + message.getReceiverId() + " is offline."));
             }
         }
-        // 保存聊天记录
-        server.saveChatMessage(message);
+        // 保存聊天记录 - 只保存文件名
+        String content = message.getContent();
+        String fileName = content.contains(":") ? content.split(":", 2)[0] : content;
+        Message historyMessage = new Message(MessageType.IMAGE_MESSAGE, message.getSenderId(), message.getReceiverId(), fileName);
+        server.saveChatMessage(historyMessage);
     }
 
     private void handleImageRequest(Message message) throws IOException {

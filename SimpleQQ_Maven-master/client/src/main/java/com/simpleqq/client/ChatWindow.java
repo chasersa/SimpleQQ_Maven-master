@@ -57,8 +57,10 @@ public class ChatWindow extends JFrame {
         friendList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 String selectedFriend = friendList.getSelectedValue();
-                if (selectedFriend != null) {
+                if (selectedFriend != null && !selectedFriend.trim().isEmpty()) {
+                    // 提取好友ID - 格式: "ID username (status)"
                     String friendId = selectedFriend.split(" ")[0];
+                    System.out.println("Selected friend: " + selectedFriend + ", extracted ID: " + friendId);
                     openSingleChatWindow(friendId);
                 }
             }
@@ -72,8 +74,9 @@ public class ChatWindow extends JFrame {
         groupList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 String selectedGroup = groupList.getSelectedValue();
-                if (selectedGroup != null) {
+                if (selectedGroup != null && !selectedGroup.trim().isEmpty()) {
                     String groupId = selectedGroup.split(" ")[0];
+                    System.out.println("Selected group: " + selectedGroup + ", extracted ID: " + groupId);
                     openGroupChatWindow(groupId);
                 }
             }
@@ -139,7 +142,7 @@ public class ChatWindow extends JFrame {
 
         deleteFriendButton.addActionListener(e -> {
             String selectedFriend = friendList.getSelectedValue();
-            if (selectedFriend != null) {
+            if (selectedFriend != null && !selectedFriend.trim().isEmpty()) {
                 String friendId = selectedFriend.split(" ")[0];
                 int confirm = JOptionPane.showConfirmDialog(this, "确定要删除好友 " + friendId + " 吗？", "删除好友", JOptionPane.YES_NO_OPTION);
                 if (confirm == JOptionPane.YES_OPTION) {
@@ -231,14 +234,16 @@ public class ChatWindow extends JFrame {
                 break;
             case ADD_FRIEND_SUCCESS:
                 JOptionPane.showMessageDialog(this, "添加好友成功: " + message.getContent());
-                client.sendMessage(new Message(MessageType.FRIEND_LIST, client.getCurrentUser().getId(), "Server", "")); // Refresh friend list
+                // 立即刷新好友列表
+                refreshFriendList();
                 break;
             case ADD_FRIEND_FAIL:
                 JOptionPane.showMessageDialog(this, "添加好友失败: " + message.getContent());
                 break;
             case DELETE_FRIEND_SUCCESS:
                 JOptionPane.showMessageDialog(this, "删除好友成功: " + message.getContent());
-                client.sendMessage(new Message(MessageType.FRIEND_LIST, client.getCurrentUser().getId(), "Server", "")); // Refresh friend list
+                // 立即刷新好友列表
+                refreshFriendList();
                 break;
             case DELETE_FRIEND_FAIL:
                 JOptionPane.showMessageDialog(this, "删除好友失败: " + message.getContent());
@@ -256,7 +261,8 @@ public class ChatWindow extends JFrame {
                 break;
             case FRIEND_ACCEPT:
                 JOptionPane.showMessageDialog(this, message.getSenderId() + " 接受了您的好友请求。");
-                client.sendMessage(new Message(MessageType.FRIEND_LIST, client.getCurrentUser().getId(), "Server", "")); // Refresh friend list
+                // 立即刷新好友列表
+                refreshFriendList();
                 break;
             case FRIEND_REJECT:
                 JOptionPane.showMessageDialog(this, message.getSenderId() + " 拒绝了您的好友请求。");
@@ -349,6 +355,7 @@ public class ChatWindow extends JFrame {
     }
 
     private void updateFriendList(String friendListStr) {
+        System.out.println("Updating friend list with: " + friendListStr);
         friendListModel.clear();
         if (friendListStr != null && !friendListStr.isEmpty()) {
             String[] friends = friendListStr.split(";");
@@ -358,10 +365,15 @@ public class ChatWindow extends JFrame {
                     String id = parts[0];
                     String username = parts[1];
                     String status = parts[2];
-                    friendListModel.addElement(id + " " + username + " (" + status + ")");
+                    String displayText = id + " " + username + " (" + status + ")";
+                    friendListModel.addElement(displayText);
+                    System.out.println("Added friend to list: " + displayText);
                 }
             }
         }
+        // 强制刷新UI
+        friendList.revalidate();
+        friendList.repaint();
     }
 
     private void updateGroupList(String groupListStr) {
@@ -372,6 +384,9 @@ public class ChatWindow extends JFrame {
                 groupListModel.addElement(groupId);
             }
         }
+        // 强制刷新UI
+        groupList.revalidate();
+        groupList.repaint();
     }
 
     private void updatePendingRequests(String pendingRequestsStr) {
@@ -401,19 +416,31 @@ public class ChatWindow extends JFrame {
     }
 
     private SingleChatWindow openSingleChatWindow(String friendId) {
+        System.out.println("Attempting to open chat window for friend: " + friendId);
+        
+        // 检查friendId是否有效
+        if (friendId == null || friendId.trim().isEmpty()) {
+            System.out.println("Invalid friend ID: " + friendId);
+            return null;
+        }
+        
         SingleChatWindow chatWindow = singleChatWindows.get(friendId);
         if (chatWindow == null) {
+            System.out.println("Creating new chat window for friend: " + friendId);
             chatWindow = new SingleChatWindow(client, friendId);
             singleChatWindows.put(friendId, chatWindow);
             chatWindow.setVisible(true);
             chatWindow.addWindowListener(new WindowAdapter() {
                 @Override
                 public void windowClosed(WindowEvent e) {
+                    System.out.println("Chat window closed for friend: " + friendId);
                     singleChatWindows.remove(friendId);
                 }
             });
         } else {
+            System.out.println("Bringing existing chat window to front for friend: " + friendId);
             chatWindow.toFront(); // Bring to front if already open
+            chatWindow.setVisible(true); // 确保窗口可见
         }
         return chatWindow;
     }
@@ -421,25 +448,38 @@ public class ChatWindow extends JFrame {
     private void closeSingleChatWindow(String friendId) {
         SingleChatWindow chatWindow = singleChatWindows.get(friendId);
         if (chatWindow != null) {
+            System.out.println("Closing chat window for friend: " + friendId);
             chatWindow.dispose();
             singleChatWindows.remove(friendId);
         }
     }
 
     private GroupChatWindow openGroupChatWindow(String groupId) {
+        System.out.println("Attempting to open group chat window for group: " + groupId);
+        
+        // 检查groupId是否有效
+        if (groupId == null || groupId.trim().isEmpty()) {
+            System.out.println("Invalid group ID: " + groupId);
+            return null;
+        }
+        
         GroupChatWindow chatWindow = groupChatWindows.get(groupId);
         if (chatWindow == null) {
+            System.out.println("Creating new group chat window for group: " + groupId);
             chatWindow = new GroupChatWindow(client, groupId);
             groupChatWindows.put(groupId, chatWindow);
             chatWindow.setVisible(true);
             chatWindow.addWindowListener(new WindowAdapter() {
                 @Override
                 public void windowClosed(WindowEvent e) {
+                    System.out.println("Group chat window closed for group: " + groupId);
                     groupChatWindows.remove(groupId);
                 }
             });
         } else {
+            System.out.println("Bringing existing group chat window to front for group: " + groupId);
             chatWindow.toFront();
+            chatWindow.setVisible(true); // 确保窗口可见
         }
         return chatWindow;
     }
@@ -474,5 +514,11 @@ public class ChatWindow extends JFrame {
         } else {
             JOptionPane.showMessageDialog(this, "请选择一个群聊邀请。");
         }
+    }
+
+    // 新增方法：刷新好友列表
+    private void refreshFriendList() {
+        System.out.println("Refreshing friend list...");
+        client.sendMessage(new Message(MessageType.FRIEND_LIST, client.getCurrentUser().getId(), "Server", ""));
     }
 }

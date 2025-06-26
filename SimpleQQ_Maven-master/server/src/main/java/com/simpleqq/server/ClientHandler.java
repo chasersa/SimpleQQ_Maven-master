@@ -106,6 +106,9 @@ public class ClientHandler extends Thread {
                     case GET_GROUP_MEMBERS:
                         sendGroupMembers(message.getContent(), message.getSenderId());
                         break;
+                    case FRIEND_LIST:
+                        sendFriendList(message.getSenderId());
+                        break;
                     default:
                         System.out.println("Unknown message type: " + message.getType());
                 }
@@ -171,6 +174,8 @@ public class ClientHandler extends Thread {
         String senderId = message.getSenderId();
         String receiverId = message.getReceiverId();
 
+        System.out.println("Processing friend request from " + senderId + " to " + receiverId);
+
         if (server.getUserManager().sendFriendRequest(senderId, receiverId)) {
             sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", senderId, "Friend request sent to " + receiverId + "."));
             ClientHandler receiverHandler = server.getOnlineClients().get(receiverId);
@@ -186,13 +191,17 @@ public class ClientHandler extends Thread {
         String acceptorId = message.getSenderId();
         String requesterId = message.getReceiverId(); // Original sender of the request
 
+        System.out.println("Processing friend accept from " + acceptorId + " for request from " + requesterId);
+
         if (server.getUserManager().acceptFriendRequest(acceptorId, requesterId)) {
-            sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", acceptorId, "You are now friends with " + requesterId + "."));
+            sendMessage(new Message(MessageType.ADD_FRIEND_SUCCESS, "Server", acceptorId, "You are now friends with " + requesterId + "."));
             ClientHandler requesterHandler = server.getOnlineClients().get(requesterId);
             if (requesterHandler != null) {
                 requesterHandler.sendMessage(new Message(MessageType.FRIEND_ACCEPT, acceptorId, requesterId, acceptorId + " accepted your friend request."));
+                // 立即发送更新的好友列表给请求者
                 requesterHandler.sendFriendList(requesterId);
             }
+            // 立即发送更新的好友列表给接受者
             sendFriendList(acceptorId);
         } else {
             sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", acceptorId, "Failed to accept friend request from " + requesterId + "."));
@@ -218,14 +227,18 @@ public class ClientHandler extends Thread {
         String requesterId = message.getSenderId();
         String targetId = message.getReceiverId();
 
+        System.out.println("Processing delete friend request from " + requesterId + " to delete " + targetId);
+
         if (server.getUserManager().deleteFriend(requesterId, targetId)) {
             sendMessage(new Message(MessageType.DELETE_FRIEND_SUCCESS, "Server", requesterId, "Friend deleted: " + targetId));
             // 通知被删除方
             ClientHandler targetHandler = server.getOnlineClients().get(targetId);
             if (targetHandler != null) {
                 targetHandler.sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", targetId, "You are no longer friends with: " + requesterId));
+                // 立即发送更新的好友列表给被删除方
                 targetHandler.sendFriendList(targetId);
             }
+            // 立即发送更新的好友列表给删除方
             sendFriendList(requesterId);
         } else {
             sendMessage(new Message(MessageType.DELETE_FRIEND_FAIL, "Server", requesterId, "Failed to delete friend: " + targetId));
@@ -233,8 +246,11 @@ public class ClientHandler extends Thread {
     }
 
     private void handleTextMessage(Message message) throws IOException {
+        System.out.println("Processing text message from " + message.getSenderId() + " to " + message.getReceiverId());
+        
         // 检查发送者和接收者是否为好友关系
         if (!server.getUserManager().areFriends(message.getSenderId(), message.getReceiverId())) {
+            System.out.println("Users " + message.getSenderId() + " and " + message.getReceiverId() + " are not friends");
             sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", message.getSenderId(), "You can only send messages to friends."));
             return;
         }
@@ -242,6 +258,7 @@ public class ClientHandler extends Thread {
         ClientHandler receiverHandler = server.getOnlineClients().get(message.getReceiverId());
         if (receiverHandler != null) {
             receiverHandler.sendMessage(message);
+            System.out.println("Message forwarded to " + message.getReceiverId());
         } else {
             // 用户不在线，可以考虑离线消息存储
             sendMessage(new Message(MessageType.SERVER_MESSAGE, "Server", message.getSenderId(), "User " + message.getReceiverId() + " is offline."));
@@ -439,18 +456,26 @@ public class ClientHandler extends Thread {
     }
 
     public void sendFriendList(String userId) throws IOException {
+        System.out.println("Sending friend list to user: " + userId);
         List<String> friendIds = server.getUserManager().getFriends(userId);
+        System.out.println("Friend IDs for " + userId + ": " + friendIds);
+        
         StringBuilder sb = new StringBuilder();
         for (String friendId : friendIds) {
             User friendUser = server.getUserManager().getUserById(friendId);
             if (friendUser != null) {
-                sb.append(friendUser.getId()).append(":").append(friendUser.getUsername()).append(":").append(friendUser.isOnline() ? "online" : "offline").append(";");
+                String friendInfo = friendUser.getId() + ":" + friendUser.getUsername() + ":" + (friendUser.isOnline() ? "online" : "offline");
+                sb.append(friendInfo).append(";");
+                System.out.println("Added friend info: " + friendInfo);
             }
         }
         if (sb.length() > 0) {
             sb.setLength(sb.length() - 1); // Remove trailing semicolon
         }
-        sendMessage(new Message(MessageType.FRIEND_LIST, "Server", userId, sb.toString()));
+        
+        String friendListContent = sb.toString();
+        System.out.println("Final friend list content: " + friendListContent);
+        sendMessage(new Message(MessageType.FRIEND_LIST, "Server", userId, friendListContent));
     }
 
     public void sendGroupList(String userId) throws IOException {

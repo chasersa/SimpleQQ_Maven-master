@@ -25,6 +25,7 @@ public class GroupChatWindow extends JFrame {
     private JButton sendButton;
     private JButton sendImageButton;
     private JButton inviteMemberButton; // New: Invite Member Button
+    private JButton refreshMembersButton; // New: Refresh Members Button
     private JList<String> memberList; // New: Member List
     private DefaultListModel<String> memberListModel; // New: Member List Model
     private SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
@@ -74,8 +75,14 @@ public class GroupChatWindow extends JFrame {
         memberList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         memberListPanel.add(new JScrollPane(memberList), BorderLayout.CENTER);
 
+        // Button panel for member actions
+        JPanel memberButtonPanel = new JPanel(new GridLayout(2, 1));
         inviteMemberButton = new JButton("邀请成员");
-        memberListPanel.add(inviteMemberButton, BorderLayout.SOUTH);
+        refreshMembersButton = new JButton("刷新成员");
+        
+        memberButtonPanel.add(inviteMemberButton);
+        memberButtonPanel.add(refreshMembersButton);
+        memberListPanel.add(memberButtonPanel, BorderLayout.SOUTH);
 
         mainPanel.add(memberListPanel, BorderLayout.EAST);
 
@@ -84,6 +91,7 @@ public class GroupChatWindow extends JFrame {
         messageField.addActionListener(e -> sendMessage());
         sendImageButton.addActionListener(e -> sendImage());
         inviteMemberButton.addActionListener(e -> inviteMember());
+        refreshMembersButton.addActionListener(e -> refreshGroupMembers());
 
         loadChatHistory();
         requestGroupMembers(); // Request initial group members
@@ -134,6 +142,11 @@ public class GroupChatWindow extends JFrame {
             client.sendMessage(new Message(MessageType.GROUP_INVITE, client.getCurrentUser().getId(), invitedId, groupId));
             JOptionPane.showMessageDialog(this, "群成员邀请已发送给 " + invitedId + "。");
         }
+    }
+
+    private void refreshGroupMembers() {
+        System.out.println("Refreshing group members for group: " + groupId);
+        requestGroupMembers();
     }
 
     public void displayMessage(Message message) {
@@ -204,5 +217,9 @@ public class GroupChatWindow extends JFrame {
         for (String member : members) {
             memberListModel.addElement(member);
         }
+        // 强制刷新UI
+        memberList.revalidate();
+        memberList.repaint();
+        System.out.println("Updated group members list with " + members.size() + " members");
     }
 }

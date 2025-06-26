@@ -120,6 +120,8 @@ public class ClientHandler extends Thread {
                 User user = server.getUserManager().getUserById(userId);
                 if (user != null) {
                     user.setOnline(false);
+                    // 通知所有在线用户更新好友列表（更新在线状态）
+                    notifyFriendsStatusChange(userId);
                 }
             }
         } finally {
@@ -152,6 +154,9 @@ public class ClientHandler extends Thread {
             sendPendingFriendRequests(id); // Send pending friend requests on login
             sendGroupList(id); // Send group list on login
             sendPendingRequests(id); // Send all pending requests on login
+            
+            // 通知所有好友用户上线了
+            notifyFriendsStatusChange(id);
         } else {
             sendMessage(new Message(MessageType.LOGIN_FAIL, "Server", id, "Invalid ID or password."));
         }
@@ -464,7 +469,10 @@ public class ClientHandler extends Thread {
         for (String friendId : friendIds) {
             User friendUser = server.getUserManager().getUserById(friendId);
             if (friendUser != null) {
-                String friendInfo = friendUser.getId() + ":" + friendUser.getUsername() + ":" + (friendUser.isOnline() ? "online" : "offline");
+                // 检查好友是否在线
+                boolean isOnline = server.isUserOnline(friendId);
+                String status = isOnline ? "online" : "offline";
+                String friendInfo = friendUser.getId() + ":" + friendUser.getUsername() + ":" + status;
                 sb.append(friendInfo).append(";");
                 System.out.println("Added friend info: " + friendInfo);
             }
@@ -533,7 +541,10 @@ public class ClientHandler extends Thread {
             for (String memberId : members) {
                 User memberUser = server.getUserManager().getUserById(memberId);
                 if (memberUser != null) {
-                    sb.append(memberUser.getId()).append(":").append(memberUser.getUsername()).append(";");
+                    // 检查成员是否在线
+                    boolean isOnline = server.isUserOnline(memberId);
+                    String status = isOnline ? "online" : "offline";
+                    sb.append(memberUser.getId()).append(":").append(memberUser.getUsername()).append(":").append(status).append(";");
                 }
             }
         }
@@ -541,5 +552,20 @@ public class ClientHandler extends Thread {
             sb.setLength(sb.length() - 1);
         }
         sendMessage(new Message(MessageType.GET_GROUP_MEMBERS, groupId, requesterId, sb.toString()));
+    }
+
+    // 通知好友状态变化
+    private void notifyFriendsStatusChange(String userId) {
+        List<String> friends = server.getUserManager().getFriends(userId);
+        for (String friendId : friends) {
+            ClientHandler friendHandler = server.getOnlineClients().get(friendId);
+            if (friendHandler != null) {
+                try {
+                    friendHandler.sendFriendList(friendId);
+                } catch (IOException e) {
+                    System.err.println("Failed to notify friend " + friendId + " of status change: " + e.getMessage());
+                }
+            }
+        }
     }
 }

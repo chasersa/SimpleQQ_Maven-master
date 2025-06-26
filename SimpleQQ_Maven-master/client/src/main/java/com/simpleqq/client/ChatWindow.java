@@ -31,6 +31,10 @@ public class ChatWindow extends JFrame {
     private DefaultListModel<String> groupInviteListModel;
     private JList<String> groupInviteList;
 
+    // Refresh buttons
+    private JButton refreshFriendsButton;
+    private JButton refreshGroupsButton;
+
     public ChatWindow(Client client) {
         this.client = client;
         this.singleChatWindows = new HashMap<>();
@@ -51,6 +55,7 @@ public class ChatWindow extends JFrame {
         tabbedPane = new JTabbedPane();
 
         // Friends Tab
+        JPanel friendsPanel = new JPanel(new BorderLayout());
         friendListModel = new DefaultListModel<>();
         friendList = new JList<>(friendListModel);
         friendList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -65,9 +70,17 @@ public class ChatWindow extends JFrame {
                 }
             }
         });
-        tabbedPane.addTab("好友", new JScrollPane(friendList));
+        friendsPanel.add(new JScrollPane(friendList), BorderLayout.CENTER);
+        
+        // Add refresh button for friends
+        refreshFriendsButton = new JButton("刷新好友");
+        refreshFriendsButton.addActionListener(e -> refreshFriendList());
+        friendsPanel.add(refreshFriendsButton, BorderLayout.SOUTH);
+        
+        tabbedPane.addTab("好友", friendsPanel);
 
         // Groups Tab
+        JPanel groupsPanel = new JPanel(new BorderLayout());
         groupListModel = new DefaultListModel<>();
         groupList = new JList<>(groupListModel);
         groupList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -81,7 +94,14 @@ public class ChatWindow extends JFrame {
                 }
             }
         });
-        tabbedPane.addTab("群聊", new JScrollPane(groupList));
+        groupsPanel.add(new JScrollPane(groupList), BorderLayout.CENTER);
+        
+        // Add refresh button for groups
+        refreshGroupsButton = new JButton("刷新群聊");
+        refreshGroupsButton.addActionListener(e -> refreshGroupList());
+        groupsPanel.add(refreshGroupsButton, BorderLayout.SOUTH);
+        
+        tabbedPane.addTab("群聊", groupsPanel);
 
         // Requests Tab
         requestPanel = new JPanel(new BorderLayout());
@@ -285,14 +305,14 @@ public class ChatWindow extends JFrame {
                 break;
             case CREATE_GROUP_SUCCESS:
                 JOptionPane.showMessageDialog(this, "群聊创建成功: " + message.getContent());
-                client.sendMessage(new Message(MessageType.GET_GROUPS, client.getCurrentUser().getId(), "Server", ""));
+                refreshGroupList();
                 break;
             case CREATE_GROUP_FAIL:
                 JOptionPane.showMessageDialog(this, "群聊创建失败: " + message.getContent());
                 break;
             case GROUP_JOIN_SUCCESS:
                 JOptionPane.showMessageDialog(this, "成功加入群聊: " + message.getContent());
-                client.sendMessage(new Message(MessageType.GET_GROUPS, client.getCurrentUser().getId(), "Server", "")); // Refresh group list
+                refreshGroupList();
                 break;
             case GROUP_JOIN_FAIL:
                 JOptionPane.showMessageDialog(this, "加入群聊失败: " + message.getContent());
@@ -516,9 +536,15 @@ public class ChatWindow extends JFrame {
         }
     }
 
-    // 新增方法：刷新好友列表
+    // 刷新好友列表
     private void refreshFriendList() {
         System.out.println("Refreshing friend list...");
         client.sendMessage(new Message(MessageType.FRIEND_LIST, client.getCurrentUser().getId(), "Server", ""));
+    }
+
+    // 刷新群聊列表
+    private void refreshGroupList() {
+        System.out.println("Refreshing group list...");
+        client.sendMessage(new Message(MessageType.GET_GROUPS, client.getCurrentUser().getId(), "Server", ""));
     }
 }

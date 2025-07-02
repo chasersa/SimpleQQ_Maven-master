@@ -1,4 +1,3 @@
-
 package com.simpleqq.client;
 
 import com.simpleqq.common.Message;
@@ -64,6 +63,11 @@ public class LoginWindow extends JFrame {
             this.setVisible(false);
         });
 
+        // 设置初始消息监听器
+        setupMessageListener();
+    }
+
+    public void setupMessageListener() {
         client.setMessageListener(message -> {
             if (message.getType() == MessageType.LOGIN_SUCCESS) {
                 User loggedInUser = new User(message.getReceiverId(), message.getContent(), ""); // content is username
@@ -89,4 +93,3 @@ public class LoginWindow extends JFrame {
         });
     }
 }
-

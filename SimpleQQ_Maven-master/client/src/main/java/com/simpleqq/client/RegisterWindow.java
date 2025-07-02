@@ -1,4 +1,3 @@
-
 package com.simpleqq.client;
 
 import com.simpleqq.common.Message;
@@ -78,14 +77,23 @@ public class RegisterWindow extends JFrame {
         });
 
         backButton.addActionListener(e -> {
+            // 恢复登录窗口的消息监听器
+            loginWindow.setupMessageListener();
             loginWindow.setVisible(true);
             this.dispose();
         });
 
+        // 设置注册窗口的消息监听器
+        setupMessageListener();
+    }
+
+    private void setupMessageListener() {
         client.setMessageListener(message -> {
             if (message.getType() == MessageType.REGISTER_SUCCESS) {
                 SwingUtilities.invokeLater(() -> {
                     JOptionPane.showMessageDialog(this, "注册成功！请登录。");
+                    // 恢复登录窗口的消息监听器
+                    loginWindow.setupMessageListener();
                     loginWindow.setVisible(true);
                     this.dispose();
                 });
@@ -97,4 +105,3 @@ public class RegisterWindow extends JFrame {
         });
     }
 }
-
